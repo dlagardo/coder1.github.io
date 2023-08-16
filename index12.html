@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Distancia</title>
+    <style>
+        /* Estilos generales */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        
+        h1 {
+            text-align: center;
+            padding: 20px 0;
+            background-color: #333;
+            color: white;
+            margin: 0;
+        }
+        
+        .calculator-header {
+            background-color: #333;
+            color: white;
+            padding: 10px 0;
+            text-align: center;
+        }
+        
+        .calculator-container {
+            max-width: 500px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        
+        label, input {
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        label {
+            font-weight: bold;
+        }
+
+        input[type="text"],
+        input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus {
+            background-color: #f0f0f0;
+            border-color: #999;
+        }
+
+        button {
+            background-color: #333;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s ease-in-out;
+        }
+        
+        button:hover {
+            background-color: #555;
+        }
+
+        .message {
+            margin-top: 10px;
+            text-align: center;
+            font-weight: bold;
+            color: green;
+        }
+
+        #resultado {
+            margin-top: 20px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        /* Mapa */
+        #map {
+            height: 300px;
+            margin-bottom: 20px;
+        }
+
+        /* Barra de progreso */
+        .progress-bar {
+            display: none;
+            height: 10px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-bar-inner {
+            height: 100%;
+            width: 0;
+            background-color: #4CAF50;
+        }
+
+        /* Responsividad */
+        @media screen and (max-width: 768px) {
+            .calculator-container {
+                padding: 10px;
+            }
+
+            input[type="text"],
+            input[type="number"] {
+                padding: 8px;
+            }
+
+            button {
+                padding: 8px 16px;
+            }
+
+            #map {
+                height: 200px;
+            }
+        }
+    </style>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyC2cPyC7h1emIUPYHmjq8TBrWZx7YGUisw&libraries=places"></script>
+    <script>
+    
+        var map;
+        var directionsService;
+        var directionsDisplay;
+        var markers = [];
+        var origenAutocomplete, destinoAutocomplete;
+    
+        var ubicacionesAnteriores = {
+            origen: null,
+            destino: null
+        };
+    
+        function initMap() {
+            map = new google.maps.Map(document.getElementById("map"), {
+                center: { lat: -34.603722, lng: -58.381592 },
+                zoom: 13,
+            });
+    
+            directionsService = new google.maps.DirectionsService();
+            directionsDisplay = new google.maps.DirectionsRenderer();
+            directionsDisplay.setMap(map);
+    
+            origenAutocomplete = new google.maps.places.Autocomplete(document.getElementById("origen"));
+            destinoAutocomplete = new google.maps.places.Autocomplete(document.getElementById("destino"));
+    
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    var geocoder = new google.maps.Geocoder();
+                    var currentLocation = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+    
+                    addMarker(currentLocation);
+    
+                    geocoder.geocode({ 'location': currentLocation }, function(results, status) {
+                        if (status === 'OK') {
+                            if (results[0]) {
+                                document.getElementById("origen").value = results[0].formatted_address;
+                            } else {
+                                console.error('No se encontraron resultados de geocodificación.');
+                            }
+                        } else {
+                            console.error('Error de geocodificación debido a: ' + status);
+                        }
+                    });
+                }, function(error) {
+                    console.error(error);
+                });
+            } else {
+                console.error("Tu navegador no admite la geolocalización.");
+            }
+    
+            map.addListener("click", function (event) {
+                addMarker(event.latLng);
+            });
+        }
+    
+        function addMarker(location) {
+            clearMarkers();
+            var marker = new google.maps.Marker({
+                position: location,
+                map: map,
+            });
+            markers.push(marker);
+    
+            var geocoder = new google.maps.Geocoder();
+            geocoder.geocode({ 'location': location }, function(results, status) {
+                if (status === 'OK') {
+                    if (results[0]) {
+                        if (ubicacionesAnteriores.origen === null) {
+                            document.getElementById("origen").value = results[0].formatted_address;
+                            ubicacionesAnteriores.origen = location;
+                        } else if (ubicacionesAnteriores.destino === null) {
+                            document.getElementById("destino").value = results[0].formatted_address;
+                            ubicacionesAnteriores.destino = location;
+                        }
+                    } else {
+                        console.error('No se encontraron resultados de geocodificación.');
+                    }
+                } else {
+                    console.error('Error de geocodificación debido a: ' + status);
+                }
+            });
+        }
+    
+        function clearMarkers() {
+            markers.forEach(function (marker) {
+                marker.setMap(null);
+            });
+            markers = [];
+        }
+    
+        function buscarDesdeMapa(target) {
+            clearMarkers();
+            var geocoder = new google.maps.Geocoder();
+    
+            map.addListener("click", function (event) {
+                addMarker(event.latLng);
+                geocoder.geocode({ 'location': event.latLng }, function(results, status) {
+                    if (status === 'OK') {
+                        if (target === 'origen') {
+                            document.getElementById('origen').value = results[0].formatted_address;
+                        } else if (target === 'destino') {
+                            document.getElementById('destino').value = results[0].formatted_address;
+                        }
+    
+                        if (document.getElementById('origen').value !== '' && document.getElementById('destino').value !== '') {
+                            trazarRuta();
+                        }
+                    } else {
+                        console.error('Error de geocodificación debido a: ' + status);
+                    }
+                    // Remover el listener después de agregar el marcador y establecer la dirección
+                    google.maps.event.clearListeners(map, 'click');
+                });
+            });
+        }
+    
+        function trazarRuta() {
+        var origen = document.getElementById("origen").value;
+        var destino = document.getElementById("destino").value;
+        var selectedMode = document.getElementById("modoTransporte").value;
+        var progressBar = document.getElementById("progress-bar");
+        var progressBarInner = document.querySelector(".progress-bar-inner");
+    
+        progressBar.style.display = "block"; // Mostrar la barra de progreso
+        progressBarInner.style.width = "0%"; // Reiniciar la barra de progreso
+    
+        var request = {
+            origin: origen,
+            destination: destino,
+            travelMode: google.maps.TravelMode[selectedMode]
+        };
+    
+        directionsService.route(request, function(result, status) {
+            if (status === 'OK') {
+                directionsDisplay.setDirections(result);
+                mostrarRutaEnMapa(result);
+                document.getElementById("mensaje").innerHTML = "Ruta trazada exitosamente.";
+            } else {
+                console.error('Error al trazar la ruta');
+                document.getElementById("mensaje").innerHTML = "Error al trazar la ruta.";
+            }
+    
+            progressBar.style.display = "none"; // Ocultar la barra de progreso
+        });
+    
+        // Actualizar la barra de progreso durante el proceso
+        var progressInterval = setInterval(function() {
+            var route = directionsDisplay.getDirections();
+            if (route && route.routes && route.routes[0]) {
+                var totalSteps = route.routes[0].legs[0].steps.length;
+                var completedSteps = route.routes[0].legs[0].steps.filter(step => step.distance && step.distance.value).length;
+                var progressPercentage = (completedSteps / totalSteps) * 100;
+                progressBarInner.style.width = progressPercentage + "%";
+                if (progressPercentage >= 100) {
+                    clearInterval(progressInterval);
+                }
+            }
+        }, 200);
+    }
+    
+    
+        function mostrarRutaEnMapa(route) {
+            directionsDisplay.setDirections(route);
+        }
+    
+        function calcularDistancia() {
+            var origen = document.getElementById("origen").value;
+            var destino = document.getElementById("destino").value;
+            var selectedMode = document.getElementById("modoTransporte").value;
+    
+            // Validar que los campos no estén vacíos
+            if (origen === "" || destino === "") {
+                document.getElementById("resultado").innerHTML = 'Debes seleccionar tanto el punto de partida como el punto de llegada.';
+                return;
+            }
+    
+            var request = {
+                origin: origen,
+                destination: destino,
+                travelMode: google.maps.TravelMode[selectedMode] // Usar el modo de transporte seleccionado
+            };
+    
+            directionsService.route(request, function(result, status) {
+                if (status === 'OK') {
+                    directionsDisplay.setDirections(result);
+                    var distancia = result.routes[0].legs[0].distance.value / 1000;
+                    var duracion = result.routes[0].legs[0].duration.text; // Obtener el tiempo estimado de llegada
+    
+                    var mensaje = `La distancia es: ${distancia.toFixed(2)} km<br>El tiempo estimado de llegada es: ${duracion}`;
+    
+                    if (selectedMode === "DRIVING") {
+                        var costo = (distancia * 10) + 300;
+                        mensaje += `<br>El costo estimado es: ${costo.toFixed(2)} pesos`;
+                    }
+    
+                    document.getElementById("resultado").innerHTML = mensaje;
+                } else {
+                    document.getElementById("resultado").innerHTML = 'Error al calcular la distancia';
+                }
+            });
+        }
+    
+        function limpiarFormulario() {
+            document.getElementById("origen").value = "";
+            document.getElementById("destino").value = "";
+            clearMarkers();
+            directionsDisplay.setMap(null);
+            document.getElementById("resultado").innerHTML = "";
+            document.getElementById("mensaje").innerHTML = "Formulario limpiado y ruta borrada.";
+        }
+    
+    
+        </script>
+</head>
+<body onload="initMap()">
+    <h1>Calculadora de Distancia</h1>
+    <div class="calculator-header">
+        <p>Selecciona los puntos en el mapa</p>
+    </div>
+    <div class="calculator-container">
+        <div id="map"></div>
+        <label for="origen">Punto de partida:</label>
+        <input type="text" id="origen">
+        <button onclick="buscarDesdeMapa('origen')">Buscar desde Mapa</button>
+ 
+        <label for="destino">Punto de llegada:</label>
+        <input type="text" id="destino">
+        <button onclick="buscarDesdeMapa('destino')">Buscar desde Mapa</button>
+        
+        <label for="modoTransporte">Modo de Viaje:</label>
+        <select id="modoTransporte">
+            <option value="DRIVING">Taxi</option>
+            <option value="WALKING">Caminar</option>
+            <option value="BICYCLING">Bicicleta</option>
+        </select>
+        <button onclick="calcularDistancia()">Calcular Distancia</button>
+        <button onclick="limpiarFormulario()">Limpiar</button>
+        <div id="progress-bar" class="progress-bar">
+            <div class="progress-bar-inner"></div>
+        </div>
+        
+        <p id="resultado"></p>
+        <p id="mensaje" class="message"></p>
+    </div>
+    <footer class="footer">
+        <!-- Contenido del footer aquí -->
+    </footer>
+</body>
+</html>
